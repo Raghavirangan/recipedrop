@@ -8,6 +8,9 @@ let dynamicRecipes = [
 
 let communitySubmissions = [];
 
+// Define your master API Key token string
+const MY_SECRET_API_KEY = "chef_raghavi_992143";
+
 export default async function handler(req, res) {
     // Unlocked CORS Cross-Origin Policies
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -16,16 +19,25 @@ export default async function handler(req, res) {
 
     if (req.method === 'OPTIONS') return res.status(200).end();
 
+    // --- SECURITY CHECK: Intercept and validate incoming API keys ---
+    // It will check inside the URL queries for GET, and the request body for POST
+    const incomingKey = req.query.apiKey || req.body.apiKey;
+
+    if (!incomingKey || incomingKey !== MY_SECRET_API_KEY) {
+        return res.status(401).json({ 
+            success: false, 
+            error: "Unauthorized: Invalid or missing API Key parameter string." 
+        });
+    }
+
     const dietParam = req.query.diet;
 
     // --- 1. HANDLE GET REQUESTS (FETCH & FILTER) ---
     if (req.method === 'GET') {
-        // Filter by diet query parameters (e.g. ?diet=Vegan)
         if (dietParam) {
             const filtered = dynamicRecipes.filter(item => item.diet.toLowerCase() === dietParam.toLowerCase());
             return res.status(200).json({ success: true, count: filtered.length, data: filtered });
         }
-        // Default: Fetch all recipes combined with user community inputs
         return res.status(200).json({ 
             success: true, 
             count: dynamicRecipes.length, 
@@ -37,11 +49,9 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
         const { action, id, title, steps, diet } = req.body;
 
-        // Action A: "Favorite" a recipe to increment its score counter
+        // Action A: "Favorite" a recipe
         if (action === "favorite" && id) {
-            // Check core recipes first
             let recipe = dynamicRecipes.find(item => item.id === id);
-            // If not found, check community submissions array
             if (!recipe) recipe = communitySubmissions.find(item => item.id === id);
 
             if (recipe) {
@@ -51,7 +61,7 @@ export default async function handler(req, res) {
             return res.status(404).json({ error: "Recipe resource ID not found" });
         }
 
-        // Action B: Submit a new custom community 3-step recipe
+        // Action B: Submit a new custom recipe
         if (title && steps && diet) {
             const newRecipe = {
                 id: `user_recipe_${Date.now()}`,
