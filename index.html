@@ -60,15 +60,22 @@
 
     <script>
         const API_URL = '/api/recipe';
+        // The master token required by your backend
+        const API_KEY = 'chef_raghavi_992143'; 
 
         async function fetchCookbook() {
             const diet = document.getElementById('dietSelect').value;
-            const url = diet ? `${API_URL}?diet=${diet}` : API_URL;
+            // Append the apiKey query directly to the GET URL
+            let url = `${API_URL}?apiKey=${API_KEY}`;
+            if (diet) url += `&diet=${diet}`;
+            
             const display = document.getElementById('recipeDisplay');
             
             try {
                 const res = await fetch(url);
                 const json = await res.json();
+                
+                if (!res.ok) throw new Error(json.error || "Authentication failed");
                 
                 if(json.data && json.data.length > 0) {
                     display.innerHTML = '';
@@ -86,7 +93,7 @@
                     display.innerHTML = '<p style="color:#78716c; text-align:center;">No recipes found for this selection.</p>';
                 }
             } catch (err) {
-                display.innerText = "Error loading recipes: " + err.message;
+                display.innerHTML = `<p style="color:#ef4444; font-weight:bold; text-align:center;">Error: ${err.message}</p>`;
             }
         }
 
@@ -95,10 +102,10 @@
                 const res = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'favorite', id: recipeId })
+                    body: JSON.stringify({ apiKey: API_KEY, action: 'favorite', id: recipeId })
                 });
                 const data = await res.json();
-                fetchCookbook(); // Refresh list to show updated count
+                fetchCookbook();
             } catch (err) { alert(err.message); }
         }
 
@@ -113,19 +120,18 @@
                 const res = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title, diet, steps })
+                    body: JSON.stringify({ apiKey: API_KEY, title, diet, steps })
                 });
                 const data = await res.json();
                 alert("Server Response: " + data.message);
                 
-                // Clear fields
                 document.getElementById('recipeTitle').value = '';
                 document.getElementById('recipeSteps').value = '';
-                fetchCookbook(); // Refresh live view
+                fetchCookbook();
             } catch (err) { alert(err.message); }
         }
 
-        // Run on startup
+        // Run automatically when the webpage fires up
         fetchCookbook();
     </script>
 </body>
