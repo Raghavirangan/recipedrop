@@ -9,7 +9,7 @@
         .wrapper { width: 100%; max-width: 700px; }
         h1 { text-align: center; color: #ea580c; margin-bottom: 5px; }
         .subtitle { text-align: center; color: #78716c; margin-bottom: 30px; font-size: 14px; }
-        .panel { background: #ffffff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.06); margin-bottom: 25px; border: 1px solid #e7e5e4; }
+        .panel { background: #ffffff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 25px; border: 1px solid #e7e5e4; }
         h3 { margin-top: 0; color: #44403c; border-bottom: 2px solid #f5f5f4; padding-bottom: 10px; }
         .flex-row { display: flex; gap: 10px; margin-bottom: 15px; }
         select, input, textarea { flex: 1; padding: 12px; background: #fff; border: 1px solid #d6d3d1; border-radius: 6px; color: #1c1917; font-family: inherit; }
@@ -60,12 +60,20 @@
 
     <script>
         const API_URL = '/api/recipe';
-        // The master token required by your backend
         const API_KEY = 'chef_raghavi_992143'; 
+
+        // Retrieve custom community posts stored locally in browser storage vault
+        function getLocalRecipes() {
+            const data = localStorage.getItem('my_custom_recipes');
+            return data ? JSON.parse(data) : [];
+        }
+
+        function saveLocalRecipes(recipesArray) {
+            localStorage.setItem('my_custom_recipes', JSON.stringify(recipesArray));
+        }
 
         async function fetchCookbook() {
             const diet = document.getElementById('dietSelect').value;
-            // Append the apiKey query directly to the GET URL
             let url = `${API_URL}?apiKey=${API_KEY}`;
             if (diet) url += `&diet=${diet}`;
             
@@ -77,9 +85,21 @@
                 
                 if (!res.ok) throw new Error(json.error || "Authentication failed");
                 
-                if(json.data && json.data.length > 0) {
+                // Get server recipes
+                let combinedData = json.data;
+                
+                // Fetch and merge locally saved client-side custom recipes
+                let localRecipes = getLocalRecipes();
+                if (diet) {
+                    localRecipes = localRecipes.filter(item => item.diet.toLowerCase() === diet.toLowerCase());
+                }
+                
+                // Unify arrays
+                combinedData = [...combinedData, ...localRecipes];
+                
+                if(combinedData.length > 0) {
                     display.innerHTML = '';
-                    json.data.forEach(item => {
+                    combinedData.forEach(item => {
                         display.innerHTML += `<div class="card">
                             <div style="flex: 1; padding-right: 15px;">
                                 <span class="badge">${item.diet}</span>
@@ -90,7 +110,7 @@
                         </div>`;
                     });
                 } else {
-                    display.innerHTML = '<p style="color:#78716c; text-align:center;">No recipes found for this selection.</p>';
+                    display.innerHTML = '<p style="color:#78716c; text-align:center;">No recipes found.</p>';
                 }
             } catch (err) {
                 display.innerHTML = `<p style="color:#ef4444; font-weight:bold; text-align:center;">Error: ${err.message}</p>`;
@@ -105,6 +125,17 @@
                     body: JSON.stringify({ apiKey: API_KEY, action: 'favorite', id: recipeId })
                 });
                 const data = await res.json();
+                
+                // If it's a locally stored custom user card, increment favorites locally!
+                if (recipeId.startsWith('local_recipe_')) {
+                    let localList = getLocalRecipes();
+                    let recipe = localList.find(item => item.id === recipeId);
+                    if (recipe) {
+                        recipe.favorites += 1;
+                        saveLocalRecipes(localList);
+                    }
+                }
+                
                 fetchCookbook();
             } catch (err) { alert(err.message); }
         }
@@ -122,8 +153,16 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ apiKey: API_KEY, title, diet, steps })
                 });
-                const data = await res.json();
-                alert("Server Response: " + data.message);
+                const responseData = await res.json();
+                
+                if (!res.ok) throw new Error(responseData.error);
+
+                // Save to local storage vault so it acts as a permanent record
+                const currentLocalRecipes = getLocalRecipes();
+                currentLocalRecipes.push(responseData.data);
+                saveLocalRecipes(currentLocalRecipes);
+
+                alert("Success: Saved to local dashboard cookbook catalog!");
                 
                 document.getElementById('recipeTitle').value = '';
                 document.getElementById('recipeSteps').value = '';
@@ -131,7 +170,7 @@
             } catch (err) { alert(err.message); }
         }
 
-        // Run automatically when the webpage fires up
+        // Run automatically when dashboard launches
         fetchCookbook();
     </script>
 </body>
