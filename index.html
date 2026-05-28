@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🍳 RecipeDrop Kitchen Sandbox</title>
+    <style>
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #fafaf9; color: #1c1917; padding: 40px 20px; display: flex; justify-content: center; }
+        .wrapper { width: 100%; max-width: 700px; }
+        h1 { text-align: center; color: #ea580c; margin-bottom: 5px; }
+        .subtitle { text-align: center; color: #78716c; margin-bottom: 30px; font-size: 14px; }
+        .panel { background: #ffffff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.06); margin-bottom: 25px; border: 1px solid #e7e5e4; }
+        h3 { margin-top: 0; color: #44403c; border-bottom: 2px solid #f5f5f4; padding-bottom: 10px; }
+        .flex-row { display: flex; gap: 10px; margin-bottom: 15px; }
+        select, input, textarea { flex: 1; padding: 12px; background: #fff; border: 1px solid #d6d3d1; border-radius: 6px; color: #1c1917; font-family: inherit; }
+        button { padding: 12px 20px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        .btn-orange { background: #ea580c; color: white; }
+        .btn-orange:hover { background: #ca8a04; }
+        .btn-green { background: #16a34a; color: white; width: 100%; }
+        .btn-green:hover { background: #15803d; }
+        .display-area { margin-top: 15px; }
+        .card { background: #fff; border: 1px solid #e7e5e4; padding: 15px; margin-top: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: flex-start; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .steps-box { font-size: 13px; color: #57534e; white-space: pre-line; margin-top: 5px; background: #fdfbf7; padding: 8px; border-radius: 4px; border-left: 3px solid #f59e0b; }
+        .badge { display: inline-block; padding: 2px 8px; font-size: 11px; font-weight: bold; border-radius: 12px; background: #ffedd5; color: #ea580c; }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <h1>🍳 RecipeDrop Kitchen Sandbox</h1>
+        <div class="subtitle">Micro-Cooking Content Management Engine</div>
+
+        <div class="panel">
+            <h3>1. Explore Cookbook (GET Requests)</h3>
+            <div class="flex-row">
+                <select id="dietSelect">
+                    <option value="">All Diet Plans</option>
+                    <option value="Veg">Vegetarian (Veg)</option>
+                    <option value="Vegan">Vegan Only</option>
+                    <option value="Keto">Ketogenic (Keto)</option>
+                </select>
+                <button class="btn-orange" onclick="fetchCookbook()">Fetch Recipes</button>
+            </div>
+            <div id="recipeDisplay" class="display-area"></div>
+        </div>
+
+        <div class="panel">
+            <h3>2. Share Your 3-Step Masterpiece (POST Request)</h3>
+            <div class="flex-row">
+                <input type="text" id="recipeTitle" placeholder="Recipe Title (e.g., Quick Mug Cake)">
+                <select id="recipeDiet">
+                    <option value="Veg">Veg</option>
+                    <option value="Vegan">Vegan</option>
+                    <option value="Keto">Keto</option>
+                </select>
+            </div>
+            <textarea id="recipeSteps" rows="3" placeholder="1. Mix ingredients in a mug.&#10;2. Microwave for 60 seconds.&#10;3. Top with chocolate chips and enjoy!" style="width:100%; box-sizing:border-box; margin-bottom:15px;"></textarea>
+            <button class="btn-green" onclick="submitCustomRecipe()">Publish Recipe (POST)</button>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/api/recipe';
+
+        async function fetchCookbook() {
+            const diet = document.getElementById('dietSelect').value;
+            const url = diet ? `${API_URL}?diet=${diet}` : API_URL;
+            const display = document.getElementById('recipeDisplay');
+            
+            try {
+                const res = await fetch(url);
+                const json = await res.json();
+                
+                if(json.data && json.data.length > 0) {
+                    display.innerHTML = '';
+                    json.data.forEach(item => {
+                        display.innerHTML += `<div class="card">
+                            <div style="flex: 1; padding-right: 15px;">
+                                <span class="badge">${item.diet}</span>
+                                <strong style="display:block; font-size:16px; margin: 4px 0;">${item.title}</strong>
+                                <div class="steps-box">${item.steps}</div>
+                            </div>
+                            <button style="background:#f43f5e; color:white; padding:6px 12px; font-size:12px; border-radius:4px;" onclick="favoriteRecipe('${item.id}')">❤️ Fav (${item.favorites})</button>
+                        </div>`;
+                    });
+                } else {
+                    display.innerHTML = '<p style="color:#78716c; text-align:center;">No recipes found for this selection.</p>';
+                }
+            } catch (err) {
+                display.innerText = "Error loading recipes: " + err.message;
+            }
+        }
+
+        async function favoriteRecipe(recipeId) {
+            try {
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'favorite', id: recipeId })
+                });
+                const data = await res.json();
+                fetchCookbook(); // Refresh list to show updated count
+            } catch (err) { alert(err.message); }
+        }
+
+        async function submitCustomRecipe() {
+            const title = document.getElementById('recipeTitle').value.trim();
+            const diet = document.getElementById('recipeDiet').value;
+            const steps = document.getElementById('recipeSteps').value.trim();
+
+            if(!title || !steps) return alert("Please fill out all recipe fields first!");
+
+            try {
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, diet, steps })
+                });
+                const data = await res.json();
+                alert("Server Response: " + data.message);
+                
+                // Clear fields
+                document.getElementById('recipeTitle').value = '';
+                document.getElementById('recipeSteps').value = '';
+                fetchCookbook(); // Refresh live view
+            } catch (err) { alert(err.message); }
+        }
+
+        // Run on startup
+        fetchCookbook();
+    </script>
+</body>
+</html>
